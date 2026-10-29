@@ -76,6 +76,20 @@ node --version    # 需要 >= 20
 
 > `<你的仓库地址>` 发布后替换为实际 GitHub 地址。
 
+
+## 快速体验（示例数据）
+
+克隆后不需要真实会话数据，直接跑示例数据即可看页面与接口：
+
+```bash
+bash scripts/setup-demo.sh      # 载入 56 张虚构示例卡，并生成 bundle.json / data.js
+cd memoryd
+node bin/memoryd.mjs serve      # http://127.0.0.1:7788/
+```
+
+- 示例数据只写入 `memory-ingest/data/cards.jsonl`（已 gitignore）；已有真实数据时脚本会拒绝覆盖，确认覆盖再加 `--force`。
+- 示例卡日期固定在 2026-10-22 ~ 10-29；页面的「今日」按运行当天计算，承诺到期状态可能和示例日期不一致，这是正常现象。
+
 ---
 
 ## 第一步：生成记忆数据（memory-ingest）

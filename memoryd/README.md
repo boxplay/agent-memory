@@ -18,6 +18,9 @@
 ## 快速开始
 
 ```bash
+# 没有真实数据？先载入示例数据（仓库根目录执行）
+# bash scripts/setup-demo.sh
+
 cd /Users/du/Documents/突如其来/memoryd
 
 node bin/memoryd.mjs doctor      # 自检：数据/权限/计数/预算/新鲜度/overlay
