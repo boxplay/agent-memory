@@ -1,0 +1,1385 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>记忆星云 · Memory Galaxy</title>
+<style>
+  :root{
+    --bg:#05060d;
+    --ink:#e7edff;
+    --dim:#8b97b8;
+    --line:rgba(150,175,230,.12);
+    --glass:rgba(14,18,34,.62);
+    --gold:#ffd166;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);overflow:hidden;
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    color:var(--ink);-webkit-font-smoothing:antialiased}
+  #stage{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:grab}
+  #stage.dragging{cursor:grabbing}
+  #stage.pointer{cursor:pointer}
+
+  /* ---------- top bar ---------- */
+  .topbar{position:fixed;top:0;left:0;right:0;height:64px;display:flex;align-items:center;gap:18px;
+    padding:0 22px;z-index:20;pointer-events:none}
+  .topbar > *{pointer-events:auto}
+  .brand{display:flex;align-items:center;gap:12px;user-select:none}
+  .brand .orb{width:30px;height:30px;border-radius:50%;position:relative;
+    background:radial-gradient(circle at 35% 35%,#fff6d8 0%,#ffd166 30%,#f0a83a 60%,rgba(240,168,58,0) 72%);
+    box-shadow:0 0 22px rgba(255,209,102,.55),0 0 60px rgba(255,168,58,.25)}
+  .brand .orb:after{content:"";position:absolute;inset:-7px;border-radius:50%;
+    border:1px solid rgba(255,209,102,.25)}
+  .brand h1{font-size:14px;letter-spacing:.28em;margin:0;font-weight:600;color:#dfe8ff}
+  .brand .sub{font-size:11px;color:var(--dim);letter-spacing:.12em;margin-top:2px}
+  .search-wrap{position:relative;flex:0 1 380px}
+  .search-wrap input{width:100%;height:34px;border-radius:17px;border:1px solid var(--line);
+    background:rgba(12,16,30,.55);color:var(--ink);padding:0 14px 0 34px;font-size:12.5px;outline:none;
+    backdrop-filter:blur(12px);transition:.2s}
+  .search-wrap input:focus{border-color:rgba(120,170,255,.45);box-shadow:0 0 0 3px rgba(90,140,255,.08)}
+  .search-wrap .ico{position:absolute;left:13px;top:9px;width:13px;height:13px;border:1.5px solid #6b7aa0;
+    border-radius:50%;pointer-events:none}
+  .search-wrap .ico:after{content:"";position:absolute;width:6px;height:1.5px;background:#6b7aa0;
+    transform:rotate(45deg);left:9px;top:9px;border-radius:2px}
+  .search-results{position:absolute;top:40px;left:0;right:0;background:rgba(13,17,32,.96);
+    border:1px solid var(--line);border-radius:12px;overflow:hidden;display:none;
+    box-shadow:0 18px 50px rgba(0,0,0,.55);backdrop-filter:blur(18px)}
+  .search-results.on{display:block}
+  .sr-item{display:flex;align-items:center;gap:9px;padding:9px 12px;cursor:pointer;font-size:12.5px}
+  .sr-item:hover{background:rgba(120,160,255,.09)}
+  .sr-item .dot{width:7px;height:7px;border-radius:50%;flex:none}
+  .sr-item .tp{font-size:10px;color:var(--dim);margin-left:auto}
+  .stats{font-size:11px;color:var(--dim);letter-spacing:.06em;white-space:nowrap}
+  .stats b{color:#cfd9f5;font-weight:600}
+  .actions{margin-left:auto;display:flex;gap:8px}
+  .btn{height:30px;padding:0 13px;border-radius:15px;border:1px solid var(--line);
+    background:rgba(14,19,36,.6);color:#c9d4ee;font-size:11.5px;cursor:pointer;
+    backdrop-filter:blur(10px);transition:.2s;letter-spacing:.04em}
+  .btn:hover{border-color:rgba(130,170,255,.4);color:#fff;background:rgba(30,42,80,.6)}
+  .btn.on{border-color:rgba(255,209,102,.5);color:#ffe6a8;box-shadow:0 0 14px rgba(255,200,90,.15)}
+
+  /* ---------- legend ---------- */
+  .legend{position:fixed;left:20px;bottom:18px;z-index:20;display:flex;flex-direction:column;gap:7px;
+    padding:12px 14px;border-radius:14px;background:var(--glass);border:1px solid var(--line);
+    backdrop-filter:blur(16px);user-select:none}
+  .legend .ttl{font-size:10px;letter-spacing:.2em;color:#6f7d9e;margin-bottom:2px}
+  .lg{display:flex;align-items:center;gap:8px;font-size:11.5px;color:#b9c5e2;cursor:pointer;
+    opacity:.95;transition:.15s}
+  .lg:hover{color:#fff}
+  .lg.off{opacity:.3;text-decoration:line-through}
+  .lg .dot{width:8px;height:8px;border-radius:50%;box-shadow:0 0 8px currentColor}
+  .lg .n{margin-left:auto;color:#63708f;font-size:10px;padding-left:14px}
+
+  /* ---------- detail panel ---------- */
+  .panel{position:fixed;top:76px;right:18px;bottom:18px;width:360px;z-index:30;
+    border-radius:18px;background:linear-gradient(180deg,rgba(16,21,40,.92),rgba(10,13,26,.94));
+    border:1px solid var(--line);backdrop-filter:blur(22px);
+    box-shadow:0 30px 80px rgba(0,0,0,.55);
+    transform:translateX(calc(100% + 30px));transition:transform .35s cubic-bezier(.2,.9,.3,1);
+    display:flex;flex-direction:column;overflow:hidden}
+  .panel.open{transform:none}
+  .p-head{display:flex;align-items:center;gap:9px;padding:16px 18px 12px;border-bottom:1px solid var(--line)}
+  .p-head .dot{width:9px;height:9px;border-radius:50%;box-shadow:0 0 10px currentColor}
+  .p-head .tp{font-size:10.5px;letter-spacing:.16em;color:#93a2c4}
+  .p-head .close{margin-left:auto;width:24px;height:24px;border-radius:8px;border:none;background:transparent;
+    color:#7f8db0;font-size:16px;cursor:pointer;line-height:1}
+  .p-head .close:hover{background:rgba(255,255,255,.06);color:#fff}
+  .p-body{padding:16px 18px 10px;overflow:auto;flex:1}
+  @keyframes swapIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .p-body.swap{animation:swapIn .28s cubic-bezier(.2,.8,.3,1)}
+  .p-title{font-size:16px;line-height:1.5;margin:0 0 12px;font-weight:600;color:#eef3ff}
+  .p-content{font-size:12.5px;line-height:1.85;color:#aeb9d6;white-space:pre-wrap}
+  .p-meta{display:flex;flex-direction:column;gap:7px;margin:16px 0 4px;padding-top:14px;border-top:1px solid var(--line)}
+  .p-meta .row{display:flex;gap:10px;font-size:11px}
+  .p-meta .k{width:44px;color:#5f6d8e;flex:none}
+  .p-meta .v{color:#9fadd0}
+  .chip{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;padding:2px 9px;border-radius:10px;
+    border:1px solid rgba(255,255,255,.09);color:#b9c6e6}
+  .chip.pending{color:#ff9d9d;border-color:rgba(255,107,107,.3);background:rgba(255,107,107,.08)}
+  .chip.done{color:#7fe3bc;border-color:rgba(90,220,170,.25);background:rgba(90,220,170,.07)}
+  .chip.expired{color:#8d93a6;border-color:rgba(160,170,200,.18)}
+  .p-sec{display:flex;align-items:center;gap:8px;margin:18px 0 8px;font-size:10.5px;letter-spacing:.16em;color:#66749a}
+  .p-sec:after{content:"";flex:1;height:1px;background:var(--line)}
+  .rel{display:flex;align-items:center;gap:9px;padding:8px 9px;border-radius:9px;cursor:pointer;transition:.15s}
+  .rel:hover{background:rgba(120,160,255,.09)}
+  .rel .dot{width:6px;height:6px;border-radius:50%;flex:none;box-shadow:0 0 7px currentColor}
+  .rel .lb{font-size:12px;color:#c2cce8;line-height:1.45}
+  .rel .tp{font-size:9.5px;color:#5f6d8e;margin-left:auto;flex:none;padding-left:8px}
+  .p-actions{display:flex;gap:8px;padding:12px 18px 16px;border-top:1px solid var(--line)}
+  .p-actions .btn{flex:1;height:32px}
+
+  /* ---------- list modal ---------- */
+  .modal{position:fixed;inset:0;z-index:40;display:none;align-items:center;justify-content:center;
+    background:rgba(3,4,10,.55);backdrop-filter:blur(6px)}
+  .modal.open{display:flex}
+  .modal-card{width:min(720px,92vw);max-height:82vh;border-radius:20px;overflow:hidden;display:flex;flex-direction:column;
+    background:linear-gradient(180deg,rgba(18,23,44,.97),rgba(10,13,26,.98));border:1px solid var(--line);
+    box-shadow:0 40px 120px rgba(0,0,0,.7)}
+  .m-head{display:flex;align-items:center;gap:16px;padding:18px 22px 0}
+  .m-head h2{font-size:14px;margin:0;letter-spacing:.18em;color:#dbe4ff;font-weight:600}
+  .m-head .close{margin-left:auto;width:28px;height:28px;border-radius:9px;border:none;background:transparent;
+    color:#7f8db0;font-size:18px;cursor:pointer}
+  .m-head .close:hover{background:rgba(255,255,255,.06);color:#fff}
+  .tabs{display:flex;gap:6px;padding:14px 22px 10px}
+  .tab{padding:6px 14px;border-radius:14px;font-size:11.5px;color:#8b98ba;cursor:pointer;border:1px solid transparent}
+  .tab:hover{color:#dbe4ff}
+  .tab.on{background:rgba(120,160,255,.12);border-color:rgba(120,160,255,.25);color:#dbe4ff}
+  .m-body{padding:4px 22px 22px;overflow:auto}
+  .day-block{margin-bottom:18px}
+  .day-h{display:flex;align-items:baseline;gap:10px;margin:14px 0 7px}
+  .day-h .d{font-size:12.5px;color:#e3eaff;font-weight:600;letter-spacing:.06em}
+  .day-h .s{font-size:11px;color:#6f7d9e;line-height:1.5}
+  .row{display:flex;align-items:flex-start;gap:9px;padding:7px 9px;border-radius:9px;cursor:pointer}
+  .row:hover{background:rgba(120,160,255,.08)}
+  .row .dot{width:6px;height:6px;border-radius:50%;margin-top:5px;flex:none;box-shadow:0 0 7px currentColor}
+  .row .tx{font-size:12px;color:#b9c5e2;line-height:1.6}
+  .row .st{margin-left:auto;font-size:10px;color:#7886a8;flex:none;padding-left:10px}
+
+  .toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,20px);z-index:60;
+    background:rgba(22,29,52,.96);border:1px solid rgba(130,170,255,.25);color:#dbe4ff;
+    font-size:12px;padding:9px 18px;border-radius:20px;opacity:0;pointer-events:none;transition:.3s;
+    box-shadow:0 12px 40px rgba(0,0,0,.5)}
+  .toast.on{opacity:1;transform:translate(-50%,0)}
+  .hint{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:15;
+    font-size:10.5px;color:#4e5b7a;letter-spacing:.1em;user-select:none;pointer-events:none}
+  body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:5;
+    background:radial-gradient(ellipse at 50% 48%,rgba(0,0,0,0) 45%,rgba(0,0,0,.40) 100%)}
+  .noanim .panel,.noanim .modal,.noanim .toast{transition:none !important}
+  #err{position:fixed;left:12px;right:12px;bottom:12px;z-index:99;display:none;white-space:pre-wrap;
+    background:#3a0d14;color:#ffb3b3;font:11px/1.5 ui-monospace,Menlo,monospace;padding:10px 14px;border-radius:10px}
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+
+<div class="topbar">
+  <div class="brand">
+    <div class="orb"></div>
+    <div>
+      <h1>MEMORY GALAXY</h1>
+      <div class="sub">记忆星云 · 点线即关联</div>
+    </div>
+  </div>
+  <div class="search-wrap">
+    <span class="ico"></span>
+    <input id="search" placeholder="搜索记忆：人、事、主题…" autocomplete="off">
+    <div class="search-results" id="searchResults"></div>
+  </div>
+  <div class="stats" id="stats"></div>
+  <div class="actions">
+    <button class="btn" id="btnList">列表视图</button>
+    <button class="btn on" id="btnRotate">自转</button>
+    <button class="btn" id="btnFit">重置视角</button>
+  </div>
+</div>
+
+<aside class="legend" id="legend">
+  <div class="ttl">图 例</div>
+</aside>
+
+<aside class="panel" id="panel">
+  <div class="p-head">
+    <span class="dot" id="pDot"></span>
+    <span class="tp" id="pType"></span>
+    <button class="close" id="pClose">×</button>
+  </div>
+  <div class="p-body">
+    <h2 class="p-title" id="pTitle"></h2>
+    <div class="p-content" id="pContent"></div>
+    <div class="p-meta" id="pMeta"></div>
+    <div class="p-sec">关联节点 <span id="pCount"></span></div>
+    <div id="pLinks"></div>
+  </div>
+  <div class="p-actions">
+    <button class="btn" id="pFocus">定位</button>
+    <button class="btn" id="pPin">置顶</button>
+    <button class="btn" id="pDone" style="display:none">标记完成</button>
+  </div>
+</aside>
+
+<div class="modal" id="modal">
+  <div class="modal-card">
+    <div class="m-head">
+      <h2>记忆列表</h2>
+      <button class="close" id="mClose">×</button>
+    </div>
+    <div class="tabs" id="tabs">
+      <div class="tab on" data-tab="timeline">时间线</div>
+      <div class="tab" data-tab="commit">承诺清单</div>
+      <div class="tab" data-tab="topic">主题</div>
+    </div>
+    <div class="m-body" id="mBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="hint">滚轮缩放 · 拖拽平移 · 点节点看关联 · 按 / 搜索</div>
+<div id="err"></div>
+
+<script>
+(function(){
+"use strict";
+window.onerror = function(msg, src, line, col){
+  var e = document.getElementById('err');
+  e.style.display = 'block';
+  e.textContent = 'JS ERROR: ' + msg + '  @' + line + ':' + col;
+};
+
+/* ============================================================
+   1. 图例 / 类型
+   ============================================================ */
+const TYPE = {
+  persona:   { color:'#FFD166', r:30,  name:'性格' },
+  profile:   { color:'#4CC9F0', r:15,  name:'画像' },
+  commitment:{ color:'#FF6B6B', r:11,  name:'承诺' },
+  day:       { color:'#93A5BD', r:10,  name:'日期' },
+  card:      { color:'#B388FF', r:6.5, name:'事件' },
+  topic:     { color:'#2DD4BF', r:5.5, name:'主题' },
+  entity:    { color:'#F472B6', r:5.5, name:'实体' },
+  segment:   { color:'#60A5FA', r:9,   name:'会话段' },
+  artifact:  { color:'#FBBF24', r:8,   name:'产物' }
+};
+const ORDER = ['topic','entity','card','day','artifact','segment','commitment','profile','persona'];
+
+/* ============================================================
+   2. Mock 数据（对齐记忆方案的文件结构）
+   ============================================================ */
+const TOPICS = ['记忆管理','会话切换','竞品调研','AI 微信','语音模型','协议对照','费用','可视化','硬件','协作','评测','工程'];
+const ENTITIES = ['Claude Code','DSH','Cumora','唯信','小米 LX06','GitHub'];
+
+const DAY_DEFS = [
+  { date:'2026-10-24', summary:'云配置与费用评估、语音实测、小智机器人方案初稿。定了"先本地跑通再上云"。', cards:[
+    { t:'event',    text:'对比 Opus / Sonnet / Gemini 的云端价格', topics:['费用'], entities:['Claude Code'] },
+    { t:'decision', text:'语音方案先本地跑通，再考虑上云', topics:['语音模型'] },
+    { t:'event',    text:'实测本机语音模型首字延迟 1.2s', topics:['语音模型'], entities:['小米 LX06'] },
+    { t:'preference',text:'汇报偏好：结论先行，再给证据', topics:['协作'] },
+    { t:'event',    text:'写完小智类 ESP32 机器人方案', topics:['硬件'], artifact:'a-robot' },
+    { t:'event',    text:'确认 DSH 只支持流式输出', topics:['协议对照'], entities:['DSH'] }
+  ]},
+  { date:'2026-10-25', summary:'三协议对照完成；能力闸门修复；更正了 DSH 的流式判断。', cards:[
+    { t:'event',    text:'整理 AI 三协议调用方式对照', topics:['协议对照'], artifact:'a-protocol' },
+    { t:'decision', text:'三种协议统一走一个适配层，不在业务里分叉', topics:['协议对照'] },
+    { t:'event',    text:'修复能力闸门，补了 3 个用例', topics:['工程'] },
+    { t:'correction',text:'更正：DSH 也支持非流式，之前只说流式是错的', topics:['协议对照'], entities:['DSH'], supersedes:'c-10-24-5' }
+  ]},
+  { date:'2026-10-26', summary:'提出记忆问题，定下四层结构与"时间由代码解析"。', cards:[
+    { t:'event',    text:'提出记忆问题：时间一长、内容一多就不行', topics:['记忆管理'] },
+    { t:'decision', text:'记忆分四层：常驻 / 今天 / 7 天索引 / 冷档', topics:['记忆管理'] },
+    { t:'event',    text:'时间索引交给代码解析，不靠模型心算日期', topics:['记忆管理'] },
+    { t:'event',    text:'now.md 改成派生视图，避免两套数据打架', topics:['记忆管理'] },
+    { t:'preference',text:'不喜欢空泛的"可以考虑"，要具体方案', topics:['协作'] }
+  ]},
+  { date:'2026-10-27', summary:'承诺状态机、压缩策略、评估集；写入侧规则兜底。', cards:[
+    { t:'event',    text:'补承诺状态机：pending / done / expired / superseded', topics:['记忆管理'] },
+    { t:'decision', text:'7 天详细 + 30 天摘要 + 永久一天一行', topics:['记忆管理'] },
+    { t:'event',    text:'写 50 条记忆评估集草案，分 6 类', topics:['评测'] },
+    { t:'event',    text:'写入侧规则兜底：含承诺/时间的句子必进候选', topics:['记忆管理'] },
+    { t:'event',    text:'承诺：买猫粮', topics:['协作'], reminds:'cm-buy-cat' }
+  ]},
+  { date:'2026-10-28', summary:'会话分段切换与交接包；防链式摘要漂移。', cards:[
+    { t:'event',    text:'设计会话超长后的分段切换与交接包', topics:['会话切换'] },
+    { t:'decision', text:'交接包从原文重新生成，不基于旧摘要', topics:['会话切换'] },
+    { t:'event',    text:'切换阈值：上下文 70% + 最小 20 轮', topics:['会话切换'] },
+    { t:'preference',text:'不要用户手动新建会话，切换要无感', topics:['会话切换'] },
+    { t:'event',    text:'承诺：周五前交稿', topics:['协作'] },
+    { t:'event',    text:'写完记忆方案文档', topics:['记忆管理'], artifact:'a-memory' }
+  ]},
+  { date:'2026-10-29', summary:'竞品调研、定位收敛、记忆可视化需求；做个星云原型。', cards:[
+    { t:'event',    text:'调研竞品：Cumora / Talkio / 唯信 / Teamily', topics:['竞品调研'], entities:['Cumora','唯信'] },
+    { t:'decision', text:'定位：私人 AI 通讯录，不是多模型聊天器', topics:['AI 微信'] },
+    { t:'event',    text:'出竞品调研报告', topics:['竞品调研'], artifact:'a-comp' },
+    { t:'correction',text:'更正：不是周五交稿，是周六交稿', topics:['协作'], supersedes:'c-10-28-4' },
+    { t:'event',    text:'提出记忆可视化：点线关联的星系图', topics:['可视化'] },
+    { t:'event',    text:'做记忆星云原型：可点、可查、可列表', topics:['可视化'], artifact:'a-proto' },
+    { t:'event',    text:'承诺：明天前给 App 信息架构', topics:['AI 微信'], reminds:'cm-ia' }
+  ]}
+];
+
+const COMMITMENTS = [
+  { id:'cm-buy-cat', text:'买猫粮', short:'买猫粮', due:'2026-10-29 21:00', status:'pending', fromDay:'2026-10-27' },
+  { id:'cm-ia',      text:'给 App 出信息架构', short:'App 信息架构', due:'2026-10-30', status:'pending', fromDay:'2026-10-29' },
+  { id:'cm-retest',  text:'复测记忆的时间检索', short:'复测检索', due:'2026-10-31', status:'pending', fromDay:'2026-10-29' },
+  { id:'cm-threshold', text:'拍板会话切换阈值', short:'拍板阈值', due:'2026-10-30', status:'pending', fromDay:'2026-10-28' },
+  { id:'cm-comp',    text:'竞品调研', short:'竞品调研', due:'2026-10-29', status:'done', fromDay:'2026-10-29' },
+  { id:'cm-report',  text:'写竞品调研报告', short:'竞品报告', due:'2026-10-29', status:'done', fromDay:'2026-10-29' },
+  { id:'cm-gate',    text:'检查门禁', short:'检查门禁', due:'2026-10-28', status:'expired', fromDay:'2026-10-28' },
+  { id:'cm-voice',   text:'语音模型实测', short:'语音实测', due:'2026-10-27', status:'done', fromDay:'2026-10-24' }
+];
+
+const PROFILES = [
+  { k:'身份', v:'独立开发者，做 AI 应用 + 硬件联动' },
+  { k:'偏好·结论', v:'结论先行，先证据后结论' },
+  { k:'偏好·表格', v:'能上表格就上表格，短句' },
+  { k:'习惯', v:'夜间工作，白天回消息慢' },
+  { k:'近况', v:'构思「模型即好友」的 AI 微信 App' },
+  { k:'关系', v:'搭档：你拍板，我执行与复测' }
+];
+
+const SEGMENTS = [
+  { id:'s1', label:'段 01', range:'10-24 → 10-26', summary:'费用、语音、协议对照；记忆问题提出。', days:['2026-10-24','2026-10-25','2026-10-26'] },
+  { id:'s2', label:'段 02', range:'10-27', summary:'记忆分层与承诺状态机定稿。', days:['2026-10-27'] },
+  { id:'s3', label:'段 03', range:'10-28', summary:'会话切换与交接包设计。', days:['2026-10-28'] },
+  { id:'s4', label:'段 04', range:'10-29', summary:'竞品调研、定位、记忆可视化。', days:['2026-10-29'] }
+];
+
+const ARTIFACTS = [
+  { id:'a-protocol', label:'AI 三协议调用方式对照.md', short:'三协议对照', from:'2026-10-25' },
+  { id:'a-robot',    label:'小智类 ESP32 机器人方案.md', short:'ESP32 方案', from:'2026-10-24' },
+  { id:'a-memory',   label:'Agent 记忆管理方案.md', short:'记忆方案', from:'2026-10-28' },
+  { id:'a-comp',     label:'AI 微信竞品调研.md', short:'竞品调研', from:'2026-10-29' },
+  { id:'a-proto',    label:'记忆星云原型 index.html', short:'星云原型', from:'2026-10-29' }
+];
+
+/* ============================================================
+   3. 构建节点与边
+   ============================================================ */
+const nodes = [];
+const links = [];
+const byId = {};
+function addNode(n){ n.r = TYPE[n.type].r; nodes.push(n); byId[n.id]=n; return n; }
+function addLink(s,t,rel){ links.push({ s:s, t:t, rel:rel }); }
+
+const persona = addNode({
+  id:'persona', type:'persona', label:'阿墨',
+  content:'性格：结论先行；中文；能上表格就上表格；不确定就追问，不自己补需求；不喜欢空泛的"可以考虑"；复述关键点再动手。',
+  meta:{ '角色':'记忆管家', '版本':'v3', '更新':'2026-10-29' },
+  ax:0, ay:0, anchor:.5
+});
+
+PROFILES.forEach((p,i)=>{
+  const n = addNode({ id:'pf'+i, type:'profile', label:p.k,
+    content:p.v, meta:{ '类型':p.k, '来源':'长期画像' }, ax:0, ay:0, anchor:.12 });
+  addLink('persona', n.id, 'has');
+});
+
+const dayNodes = {};
+DAY_DEFS.forEach((d,di)=>{
+  const dn = addNode({ id:'day:'+d.date, type:'day', label:d.date.slice(5),
+    content:d.summary, meta:{ '日期':d.date, '类型':'日摘要' }, ax:0, ay:0, anchor:.14, dayIndex:di });
+  dayNodes[d.date] = dn;
+});
+
+const cardNodes = [];
+DAY_DEFS.forEach((d,di)=>{
+  d.cards.forEach((c,ci)=>{
+    const id = 'c-' + d.date.slice(5) + '-' + ci;
+    const n = addNode({ id:id, type:'card', label:c.text.length>16 ? c.text.slice(0,16)+'…' : c.text,
+      content:c.text, meta:{ '日期':d.date, '类型': c.t==='decision'?'决定':c.t==='preference'?'偏好':c.t==='correction'?'更正':'事件' },
+      ax:0, ay:0, anchor:.06, cardType:c.t, dayRef:d.date });
+    cardNodes.push(n);
+    addLink('day:'+d.date, n.id, 'contains');
+    (c.topics||[]).forEach(t=>{ if(TOPICS.includes(t)) addLink(n.id, 'tp:'+t, 'mentions'); });
+    (c.entities||[]).forEach(e=>{ if(ENTITIES.includes(e)) addLink(n.id, 'en:'+e, 'mentions'); });
+    if(c.reminds) addLink(n.id, 'cm:'+c.reminds, 'reminds');
+    if(c.artifact) addLink(n.id, 'af:'+c.artifact, 'produced');
+    if(c.supersedes){
+      const target = byId['c-' + c.supersedes.slice(2)];
+      if(target) addLink(n.id, target.id, 'supersedes');
+    }
+  });
+});
+
+COMMITMENTS.forEach(c=>{
+  const n = addNode({ id:'cm:'+c.id, type:'commitment', label:c.short,
+    content:c.text, meta:{ '截止':c.due, '状态':c.status==='pending'?'待处理':c.status==='done'?'已完成':'已逾期' },
+    ax:0, ay:0, anchor:.05, status:c.status, due:c.due });
+  if(dayNodes[c.due.slice(0,10)]) addLink(n.id, dayNodes[c.due.slice(0,10)].id, 'due');
+});
+
+TOPICS.forEach(t=>{
+  addNode({ id:'tp:'+t, type:'topic', label:'#'+t, content:'主题：'+t, meta:{ '类型':'主题聚合' }, ax:0, ay:0, anchor:.04 });
+});
+ENTITIES.forEach(e=>{
+  addNode({ id:'en:'+e, type:'entity', label:e, content:'实体：'+e, meta:{ '类型':'实体' }, ax:0, ay:0, anchor:.04 });
+});
+
+SEGMENTS.forEach(s=>{
+  const n = addNode({ id:'sg:'+s.id, type:'segment', label:s.label,
+    content:s.summary, meta:{ '范围':s.range, '类型':'会话段' }, ax:0, ay:0, anchor:.08 });
+  s.days.forEach(d=> addLink(n.id, 'day:'+d, 'covers'));
+});
+
+ARTIFACTS.forEach(a=>{
+  const n = addNode({ id:'af:'+a.id, type:'artifact', label:a.short,
+    content:'产物：'+a.label, meta:{ '生成日':a.from, '类型':'文件' }, ax:0, ay:0, anchor:.08 });
+  if(dayNodes[a.from]) addLink('day:'+a.from, n.id, 'contains');
+});
+
+// 日期链：把时间线画出来
+for(let i=0;i<DAY_DEFS.length-1;i++){
+  addLink('day:'+DAY_DEFS[i].date, 'day:'+DAY_DEFS[i+1].date, 'next');
+}
+
+// 主题互链（少量，形成"星桥"）
+[['记忆管理','会话切换'],['记忆管理','评测'],['竞品调研','AI 微信'],['可视化','记忆管理'],['协议对照','工程'],['语音模型','硬件']]
+  .forEach(p=>{ if(byId['tp:'+p[0]] && byId['tp:'+p[1]]) addLink('tp:'+p[0], 'tp:'+p[1], 'related'); });
+
+/* ============================================================
+   4. 初始布局（螺旋星系）
+   ============================================================ */
+function layout(){
+  persona.x = 0; persona.y = 0;
+
+  // 画像内环
+  const pf = nodes.filter(n=>n.type==='profile');
+  pf.forEach((n,i)=>{
+    const a = -Math.PI/2 + i * (Math.PI*2/pf.length) + 0.18;
+    n.ax = n.x = Math.cos(a)*175;
+    n.ay = n.y = Math.sin(a)*165;
+  });
+
+  // 承诺中环
+  const cms = nodes.filter(n=>n.type==='commitment');
+  cms.forEach((n,i)=>{
+    const a = -Math.PI/2 + i * (Math.PI*2/cms.length) + 0.28;
+    n.ax = n.x = Math.cos(a)*275;
+    n.ay = n.y = Math.sin(a)*275;
+  });
+
+  // 日期：一条旋臂，越新越靠内
+  const nDays = DAY_DEFS.length;
+  DAY_DEFS.forEach((d,di)=>{
+    const age = nDays - 1 - di;
+    const a = 0.5 - age * 0.95;
+    const r = 372 + age * 27;
+    const n = dayNodes[d.date];
+    n.ax = n.x = Math.cos(a)*r;
+    n.ay = n.y = Math.sin(a)*r;
+    n.angle = a; n.radius = r;
+  });
+
+  // 事件卡：围绕当天日期的小星团
+  DAY_DEFS.forEach(d=>{
+    const dn = dayNodes[d.date];
+    const cards = nodes.filter(n=>n.type==='card' && n.dayRef===d.date);
+    const m = cards.length;
+    cards.forEach((n,j)=>{
+      const a = dn.angle + (j - (m-1)/2) * 0.34;
+      const r = dn.radius + 60 + (j%2)*20;
+      n.ax = n.x = Math.cos(a)*r;
+      n.ay = n.y = Math.sin(a)*r;
+    });
+  });
+
+  // 主题 / 实体：挂在关联卡片质心
+  function centroid(list){
+    let x=0,y=0,c=0;
+    list.forEach(id=>{ const n=byId[id]; if(n && n.type==='card'){ x+=n.x; y+=n.y; c++; } });
+    return c ? [x/c, y/c] : [0,0];
+  }
+  nodes.filter(n=>n.type==='topic'||n.type==='entity').forEach(n=>{
+    const ids = links.filter(l=>l.s===n.id || l.t===n.id).map(l=> l.s===n.id ? l.t : l.s);
+    const [x,y] = centroid(ids);
+    n.ax = n.x = x * 0.92;
+    n.ay = n.y = y * 0.92;
+  });
+
+  // 会话段：所覆盖日期外侧
+  nodes.filter(n=>n.type==='segment').forEach(n=>{
+    const ds = links.filter(l=>l.s===n.id && l.rel==='covers').map(l=>byId[l.t]);
+    if(ds.length){
+      let x=0,y=0; ds.forEach(d=>{x+=d.x;y+=d.y});
+      x/=ds.length; y/=ds.length;
+      const len = Math.hypot(x,y) || 1;
+      n.ax = n.x = x + x/len*150;
+      n.ay = n.y = y + y/len*170;
+    } else { n.ax=n.x=0; n.ay=n.y=0; }
+  });
+
+  // 产物：来源日期外侧
+  nodes.filter(n=>n.type==='artifact').forEach(n=>{
+    const d = links.filter(l=>l.t===n.id).map(l=>byId[l.s]).find(x=>x && x.type==='day');
+    if(d){
+      const len = Math.hypot(d.x,d.y) || 1;
+      n.ax = n.x = d.x + d.x/len*112;
+      n.ay = n.y = d.y + d.y/len*125;
+    } else { n.ax=n.x=0; n.ay=n.y=0; }
+  });
+
+  // 轻量力导向：互斥 + 回锚
+  const all = nodes;
+  for(let it=0; it<160; it++){
+    for(let i=0;i<all.length;i++){
+      for(let j=i+1;j<all.length;j++){
+        const a=all[i], b=all[j];
+        let dx=b.x-a.x, dy=b.y-a.y;
+        let d2=dx*dx+dy*dy;
+        if(d2 < 1) { dx=Math.random()-.5; dy=Math.random()-.5; d2=1; }
+        if(d2 > 52000) continue;
+        const d = Math.sqrt(d2);
+        const f = 1200 / d2;
+        dx/=d; dy/=d;
+        a.x -= dx*f; a.y -= dy*f;
+        b.x += dx*f; b.y += dy*f;
+      }
+    }
+    all.forEach(n=>{
+      n.x += (n.ax - n.x) * n.anchor;
+      n.y += (n.ay - n.y) * n.anchor;
+    });
+  }
+  let maxR = 0;
+  all.forEach(n=>{ maxR = Math.max(maxR, Math.hypot(n.x,n.y) + n.r*2); });
+  return maxR;
+}
+const MAX_R = layout() * 1.02;
+
+/* ============================================================
+   5. 画布 / 视图
+   ============================================================ */
+const canvas = document.getElementById('stage');
+const ctx = canvas.getContext('2d');
+let W=0,H=0,DPR=1,cx=0,cy=0;
+let bg = null;
+let stars = [];
+
+const view = { scale:1, panX:0, panY:0, rot:0, autoRotate:true, fitScale:1 };
+
+function resize(){
+  DPR = Math.min(window.devicePixelRatio||1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W*DPR; canvas.height = H*DPR;
+  canvas.style.width = W+'px'; canvas.style.height = H+'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  cx = W/2; cy = H/2;
+  buildBackground();
+  buildStars();
+  buildDust();
+  buildPuffs();
+  fitView(true);
+}
+function fitView(reset){
+  view.fitScale = Math.min(W,H) / (2*MAX_R) * 1.05;
+  view.scale = view.fitScale;
+  view.panX = 0; view.panY = 0;
+  if(reset) view.rot = 0;
+}
+window.addEventListener('resize', ()=>resize());
+
+let puffs = [];
+function buildPuffs(){
+  const rnd = mulberry32(2026); puffs = [];
+  const cols = ['120,90,220','70,110,220','60,170,190','180,90,140','160,120,220'];
+  for(let i=0;i<34;i++){
+    const dayIdx = Math.floor(rnd()*DAY_DEFS.length);
+    const age = DAY_DEFS.length - 1 - dayIdx;
+    const a = 0.5 - age*0.95 + (rnd()-0.5)*0.7;
+    const r = 372 + age*27 + (rnd()-0.5)*140;
+    puffs.push({ x:Math.cos(a)*r, y:Math.sin(a)*r, size:55+rnd()*95,
+      a:0.05+rnd()*0.055, c:cols[Math.floor(rnd()*cols.length)] });
+  }
+}
+let dust = [];
+function buildDust(){
+  const rnd = mulberry32(99); dust = [];
+  for(let i=0;i<720;i++){
+    const rr = 310 + rnd()*330;
+    const age = (rr-470)/6;
+    const a = 0.5 - age*0.95 + (rnd()-0.5)*0.95;
+    const r = rr + (rnd()-0.5)*80;
+    dust.push({ x:Math.cos(a)*r, y:Math.sin(a)*r, s:rnd()*1.2+0.3,
+      a:0.045+rnd()*0.12, p:rnd()*6.28, c: rnd()<0.55?'180,205,255':'205,175,255' });
+  }
+  for(let i=0;i<300;i++){
+    const a = rnd()*6.28, r = Math.pow(rnd(),0.55)*340;
+    dust.push({ x:Math.cos(a)*r, y:Math.sin(a)*r, s:rnd()*1.3+0.25,
+      a:0.02+rnd()*0.07, p:rnd()*6.28, c:'255,220,180' });
+  }
+}
+function buildStars(){
+  const rnd = mulberry32(20261029);
+  stars = [];
+  const n = Math.round(W*H/5200);
+  for(let i=0;i<n;i++){
+    stars.push({ x:rnd()*W, y:rnd()*H, r:rnd()*1.2+0.25, a:rnd()*0.5+0.15, p:rnd()*Math.PI*2 });
+  }
+}
+function buildBackground(){
+  bg = document.createElement('canvas');
+  bg.width = W; bg.height = H;
+  const b = bg.getContext('2d');
+  const g = b.createLinearGradient(0,0,W,H);
+  g.addColorStop(0,'#04050b'); g.addColorStop(.5,'#070a16'); g.addColorStop(1,'#05060e');
+  b.fillStyle = g; b.fillRect(0,0,W,H);
+  const rnd = mulberry32(7);
+  const blobs = [
+    [W*0.46,H*0.5, W*0.42, 'rgba(72,50,160,0.16)'],
+    [W*0.55,H*0.42,W*0.34, 'rgba(24,70,150,0.14)'],
+    [W*0.38,H*0.62,W*0.3,  'rgba(20,110,120,0.07)'],
+    [W*0.62,H*0.58,W*0.26, 'rgba(150,40,90,0.05)']
+  ];
+  blobs.forEach(function(bl){
+    const rg = b.createRadialGradient(bl[0],bl[1],0,bl[0],bl[1],bl[2]);
+    rg.addColorStop(0, bl[3]); rg.addColorStop(1, 'rgba(0,0,0,0)');
+    b.fillStyle = rg; b.fillRect(0,0,W,H);
+  });
+  // 细颗粒
+  for(let i=0;i<900;i++){
+    b.fillStyle = 'rgba(180,200,255,'+(rnd()*0.05)+')';
+    b.fillRect(rnd()*W, rnd()*H, 1, 1);
+  }
+}
+function mulberry32(a){
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+/* ---------- 精灵（发光节点） ---------- */
+function hexA(hex, a){
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return 'rgba('+r+','+g+','+b+','+a+')';
+}
+const sprites = {};
+Object.keys(TYPE).forEach(t=>{
+  const c = TYPE[t].color, r = TYPE[t].r;
+  const size = Math.ceil(r*6);
+  const cv = document.createElement('canvas');
+  cv.width = size; cv.height = size;
+  const g = cv.getContext('2d');
+  const ctr = size/2;
+  const rg = g.createRadialGradient(ctr,ctr,0,ctr,ctr,size/2);
+  rg.addColorStop(0,'rgba(255,255,255,0.98)');
+  rg.addColorStop(0.08, hexA(c,0.95));
+  rg.addColorStop(0.2, hexA(c,0.55));
+  rg.addColorStop(0.42, hexA(c,0.16));
+  rg.addColorStop(0.72, hexA(c,0.04));
+  rg.addColorStop(1, hexA(c,0));
+  g.fillStyle = rg; g.fillRect(0,0,size,size);
+  sprites[t] = { cv:cv, r:r };
+});
+
+/* ============================================================
+   6. 坐标变换
+   ============================================================ */
+function rotPt(x,y){
+  const c = Math.cos(view.rot), s = Math.sin(view.rot);
+  return [x*c - y*s, x*s + y*c];
+}
+function toScreen(x,y){
+  const p = rotPt(x,y);
+  return [cx + p[0]*view.scale + view.panX, cy + p[1]*view.scale + view.panY];
+}
+function fromScreen(sx,sy){
+  const x = (sx - cx - view.panX)/view.scale;
+  const y = (sy - cy - view.panY)/view.scale;
+  const c = Math.cos(view.rot), s = Math.sin(view.rot);
+  return [x*c + y*s, -x*s + y*c];
+}
+
+/* ============================================================
+   7. 交互状态
+   ============================================================ */
+let hovered = null, selected = null;
+let panning = false, dragNode = null, dragOffX = 0, dragOffY = 0;
+let mouse = { x:0, y:0, downX:0, downY:0, moved:false };
+const hidden = {};
+
+/* ---- 动画状态 ---- */
+const ANIM = { cam:null, focusMode:false, saved:null };
+const ripples = [];
+nodes.forEach(n=>{ n._a = 1; n._k = 0; n._vis = 1; });
+links.forEach(l=>{ l._a = 1; });
+
+function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+function lerp(a,b,t){ return a + (b-a)*t; }
+function easeInOut(t){ return t<0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2; }
+function easeOut(t){ return 1 - Math.pow(1-t,3); }
+
+/* ============================================================
+   8. 绘制
+   ============================================================ */
+let lastT = performance.now();
+function frame(now){
+  const dt = Math.min(now - lastT, 50); lastT = now;
+  updateCam(now);
+  updateNodeAnim(dt);
+  if(view.autoRotate && !panning && !dragNode && !hovered && !ANIM.focusMode && !ANIM.cam){
+    view.rot += dt * 0.000028;
+  }
+  draw(now);
+  requestAnimationFrame(frame);
+}
+
+function updateCam(now){
+  const c = ANIM.cam;
+  if(!c) return;
+  const t = clamp((now - c.t0)/c.dur, 0, 1);
+  const e = c.ease(t);
+  view.scale = lerp(c.s0, c.s1, e);
+  view.panX  = lerp(c.x0, c.x1, e);
+  view.panY  = lerp(c.y0, c.y1, e);
+  if(t >= 1){
+    ANIM.cam = null;
+    if(c.onDone) c.onDone();
+  }
+}
+
+function animateCam(to, dur, opts){
+  opts = opts || {};
+  ANIM.cam = {
+    t0: performance.now(), dur: dur || 620,
+    s0: view.scale, x0: view.panX, y0: view.panY,
+    s1: to.scale, x1: to.panX, y1: to.panY,
+    ease: opts.ease || easeInOut,
+    onDone: opts.onDone || null
+  };
+}
+
+function updateNodeAnim(dt){
+  const f = hovered || selected;
+  const fid = f ? f.id : null;
+  const near = new Set();
+  if(f){
+    links.forEach(l=>{
+      if(l.s===fid) near.add(l.t);
+      else if(l.t===fid) near.add(l.s);
+    });
+  }
+  const k = Math.min(1, dt/110);
+  const kv = Math.min(1, dt/160);
+  for(let i=0;i<nodes.length;i++){
+    const n = nodes[i];
+    let ta = 1, tk = 0;
+    if(f){
+      if(n.id===fid){ ta = 1; tk = 1; }
+      else if(near.has(n.id)){ ta = 0.9; tk = 0.5; }
+      else { ta = 0.14; tk = 0; }
+    }
+    n._a += (ta - n._a)*k;
+    n._k += (tk - n._k)*k;
+    const tv = hidden[n.type] ? 0 : 1;
+    n._vis += (tv - n._vis)*kv;
+  }
+  for(let i=0;i<links.length;i++){
+    const l = links[i];
+    let ta = 1;
+    if(f){
+      const on = (l.s===fid || l.t===fid);
+      ta = on ? 1 : 0.09;
+    }
+    l._a += (ta - l._a)*k;
+  }
+  for(let i=ripples.length-1;i>=0;i--){
+    if(performance.now() - ripples[i].t0 > 950) ripples.splice(i,1);
+  }
+}
+
+function draw(now){
+  const t = now;
+  if(bg) ctx.drawImage(bg,0,0,W,H);
+
+  // 星空
+  for(let i=0;i<stars.length;i++){
+    const s = stars[i];
+    const a = s.a * (0.55 + 0.45*Math.sin(t*0.0012 + s.p));
+    ctx.fillStyle = 'rgba(190,210,255,'+a.toFixed(3)+')';
+    ctx.fillRect(s.x, s.y, s.r, s.r);
+  }
+
+  for(let i=0;i<nodes.length;i++) nodes[i]._sx = undefined;
+
+  // 星云团
+  ctx.globalCompositeOperation = 'lighter';
+  for(let i=0;i<puffs.length;i++){
+    const pf = puffs[i];
+    const p = rotPt(pf.x,pf.y);
+    const px = cx + p[0]*view.scale + view.panX;
+    const py = cy + p[1]*view.scale + view.panY;
+    const sr = pf.size*view.scale;
+    if(px<-sr||px>W+sr||py<-sr||py>H+sr) continue;
+    const rg = ctx.createRadialGradient(px,py,0,px,py,sr);
+    rg.addColorStop(0,'rgba('+pf.c+','+pf.a+')');
+    rg.addColorStop(0.55,'rgba('+pf.c+','+(pf.a*0.45).toFixed(3)+')');
+    rg.addColorStop(1,'rgba('+pf.c+',0)');
+    ctx.fillStyle = rg; ctx.fillRect(px-sr,py-sr,sr*2,sr*2);
+  }
+  ctx.globalCompositeOperation = 'source-over';
+
+  // 旋臂尘埃
+  for(let i=0;i<dust.length;i++){
+    const d = dust[i];
+    const p = rotPt(d.x,d.y);
+    const px = cx + p[0]*view.scale + view.panX;
+    const py = cy + p[1]*view.scale + view.panY;
+    if(px<-30||px>W+30||py<-30||py>H+30) continue;
+    const al = d.a * (0.55 + 0.45*Math.sin(t*0.0009 + d.p));
+    ctx.fillStyle = 'rgba('+d.c+','+al.toFixed(3)+')';
+    ctx.fillRect(px, py, d.s, d.s);
+  }
+
+  // 星系核心辉光
+  const cpos = toScreen(0,0);
+  const coreR = Math.max(170, 220*view.scale);
+  const cg = ctx.createRadialGradient(cpos[0],cpos[1],0,cpos[0],cpos[1],coreR);
+  cg.addColorStop(0,'rgba(255,214,120,0.16)');
+  cg.addColorStop(0.35,'rgba(150,110,220,0.08)');
+  cg.addColorStop(0.7,'rgba(70,90,200,0.02)');
+  cg.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle = cg; ctx.fillRect(0,0,W,H);
+
+  const cos = Math.cos(view.rot), sin = Math.sin(view.rot);
+  const scale = view.scale;
+
+  // 日期星团光晕
+  ctx.globalCompositeOperation = 'lighter';
+  nodes.forEach(n=>{
+    if(n.type!=='day' || n._vis < 0.05) return;
+    const p = rotPt(n.x,n.y);
+    const px = cx + p[0]*scale + view.panX;
+    const py = cy + p[1]*scale + view.panY;
+    const rr = 88*scale;
+    const rg = ctx.createRadialGradient(px,py,0,px,py,rr);
+    rg.addColorStop(0,'rgba(120,145,220,0.075)');
+    rg.addColorStop(0.6,'rgba(100,120,200,0.028)');
+    rg.addColorStop(1,'rgba(100,120,200,0)');
+    ctx.fillStyle = rg; ctx.fillRect(px-rr,py-rr,rr*2,rr*2);
+  });
+  ctx.globalCompositeOperation = 'source-over';
+
+  // 连线
+  ctx.lineCap = 'round';
+  for(let i=0;i<links.length;i++){
+    const l = links[i];
+    const a = byId[l.s], b = byId[l.t];
+    if(!a || !b) continue;
+    const vis = Math.min(a._vis, b._vis);
+    if(vis < 0.02) continue;
+    let alpha = 0.19;
+    if(l.rel==='supersedes') alpha = 0.66;
+    else if(l.rel==='reminds') alpha = 0.4;
+    else if(l.rel==='related') alpha = 0.22;
+    else if(l.rel==='due') alpha = 0.3;
+    else if(l.rel==='produced') alpha = 0.28;
+    else if(l.rel==='evidence') alpha = 0.2;
+    else if(l.rel==='covers') alpha = 0.12;
+    else if(l.rel==='mentions') alpha = 0.115;
+    else if(l.rel==='next') alpha = 0.22;
+    else if(l.rel==='contains') alpha = 0.15;
+    alpha *= l._a * vis;
+    if(alpha < 0.008) continue;
+
+    const sx1 = cx + (a.x*cos - a.y*sin)*scale + view.panX;
+    const sy1 = cy + (a.x*sin + a.y*cos)*scale + view.panY;
+    const sx2 = cx + (b.x*cos - b.y*sin)*scale + view.panX;
+    const sy2 = cy + (b.x*sin + b.y*cos)*scale + view.panY;
+    if((sx1<-80&&sx2<-80)||(sx1>W+80&&sx2>W+80)||(sy1<-80&&sy2<-80)||(sy1>H+80&&sy2>H+80)) continue;
+
+    const mx = (sx1+sx2)/2, my = (sy1+sy2)/2;
+    const dx = sx2-sx1, dy = sy2-sy1;
+    const len = Math.hypot(dx,dy) || 1;
+    const bend = ((i*37)%10)/10 * 0.22 + 0.04;
+    const cpx = mx - dy/len * len * bend * 0.5;
+    const cpy = my + dx/len * len * bend * 0.5;
+
+    ctx.beginPath();
+    ctx.moveTo(sx1,sy1);
+    ctx.quadraticCurveTo(cpx,cpy,sx2,sy2);
+    if(l.rel==='supersedes' || l.rel==='next') ctx.setLineDash([3,6]); else ctx.setLineDash([]);
+    ctx.strokeStyle = l.rel==='supersedes' ? 'rgba(255,120,120,'+alpha+')'
+      : l.rel==='reminds' ? 'rgba(255,140,140,'+alpha+')'
+      : l.rel==='related' ? 'rgba(60,220,200,'+alpha+')'
+      : l.rel==='due' ? 'rgba(255,150,150,'+alpha+')'
+      : l.rel==='produced' ? 'rgba(250,200,90,'+alpha+')'
+      : l.rel==='covers' ? 'rgba(110,160,255,'+alpha+')'
+      : l.rel==='next' ? 'rgba(150,190,255,'+alpha+')'
+      : 'rgba(150,175,235,'+alpha+')';
+    ctx.lineWidth = l.rel==='supersedes' ? 1.4 : 1;
+    ctx.stroke();
+    l._g = { x1:sx1,y1:sy1,cx:cpx,cy:cpy,x2:sx2,y2:sy2 };
+  }
+  ctx.setLineDash([]);
+
+  // 沿连线的流光
+  ctx.globalCompositeOperation = 'lighter';
+  for(let i=0;i<links.length;i+=6){
+    const l = links[i]; if(!l._g) continue;
+    const g = l._g;
+    const tt = ((now*0.00013 + i*0.171) % 1);
+    const u = 1-tt;
+    const px = u*u*g.x1 + 2*u*tt*g.cx + tt*tt*g.x2;
+    const py = u*u*g.y1 + 2*u*tt*g.cy + tt*tt*g.y2;
+    const col = l.rel==='supersedes' ? '255,120,120'
+      : l.rel==='reminds' ? '255,150,150'
+      : l.rel==='related' ? '60,230,205'
+      : l.rel==='mentions' ? '120,200,255'
+      : '190,205,255';
+    const rg = ctx.createRadialGradient(px,py,0,px,py,5);
+    rg.addColorStop(0,'rgba('+col+',0.55)');
+    rg.addColorStop(1,'rgba('+col+',0)');
+    ctx.fillStyle = rg;
+    ctx.fillRect(px-5,py-5,10,10);
+  }
+  ctx.globalCompositeOperation = 'source-over';
+
+  // 节点
+  const list = nodes.slice().sort((a,b)=>ORDER.indexOf(a.type)-ORDER.indexOf(b.type));
+  for(let i=0;i<list.length;i++){
+    const n = list[i];
+    if(n._vis < 0.02) continue;
+    const def = TYPE[n.type];
+    const spr = sprites[n.type];
+    const pulse = (n.type==='commitment' && n.status==='pending')
+      ? 1 + 0.06*Math.sin(t*0.004 + (n.y||0)*0.01) : 1;
+    const ns = n.r * (1 + 0.45*n._k) * pulse;
+
+    const px = cx + (n.x*cos - n.y*sin)*scale + view.panX;
+    const py = cy + (n.x*sin + n.y*cos)*scale + view.panY;
+    n._sx = px; n._sy = py; n._sr = ns*scale;
+    if(px < -120 || px > W+120 || py < -120 || py > H+120) continue;
+
+    const alpha = n._a * n._vis;
+    const size = spr.r*6*scale*(ns/spr.r);
+    const isBig = n.type==='persona' || n.type==='profile' || n.type==='commitment' || n.type==='day' || n.type==='artifact';
+    ctx.globalAlpha = alpha;
+    ctx.globalCompositeOperation = 'lighter';
+    if(isBig){
+      const hs = size*2.4;
+      ctx.globalAlpha = alpha*0.16;
+      ctx.drawImage(spr.cv, px - hs/2, py - hs/2, hs, hs);
+      ctx.globalAlpha = alpha;
+    }
+    ctx.drawImage(spr.cv, px - size/2, py - size/2, size, size);
+    ctx.globalCompositeOperation = 'source-over';
+
+    // 承诺状态环
+    if(n.type==='commitment' && n.status!=='pending'){
+      ctx.beginPath();
+      ctx.arc(px,py,Math.max(ns*scale*0.9,4),0,Math.PI*2);
+      ctx.strokeStyle = n.status==='done' ? 'rgba(110,231,183,0.5)' : 'rgba(150,160,190,0.35)';
+      ctx.lineWidth = 1; ctx.stroke();
+    }
+    // 选中环
+    if(n === selected){
+      ctx.beginPath();
+      ctx.arc(px,py,Math.max(ns*scale*1.9,8),0,Math.PI*2);
+      ctx.strokeStyle = hexA(def.color,0.65);
+      ctx.lineWidth = 1.2; ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(px,py,Math.max(ns*scale*2.6,11),0,Math.PI*2);
+      ctx.strokeStyle = hexA(def.color,0.18);
+      ctx.lineWidth = 1; ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // 点击涟漪
+  for(let i=0;i<ripples.length;i++){
+    const r = ripples[i];
+    const age = (t - r.t0)/950;
+    if(age < 0 || age > 1) continue;
+    const p = rotPt(r.x, r.y);
+    const px = cx + p[0]*scale + view.panX;
+    const py = cy + p[1]*scale + view.panY;
+    ctx.beginPath();
+    ctx.arc(px, py, (10 + age*80)*scale, 0, Math.PI*2);
+    ctx.strokeStyle = hexA(r.color, (1-age)*0.5);
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+  }
+
+  // 标签
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  for(let i=0;i<list.length;i++){
+    const n = list[i];
+    if(n._vis < 0.05) continue;
+    if(n._sx===undefined) continue;
+    const isFocus = n===hovered || n===selected;
+    const big = n.type==='persona' || n.type==='profile' || n.type==='day' || n.type==='commitment';
+    const mid = n.type==='artifact' || n.type==='segment';
+    const show = isFocus || n.type==='persona'
+      || (big && scale > 0.52)
+      || (mid && scale > 0.98)
+      || (scale > 1.15 && (n.type==='topic' || n.type==='entity'))
+      || (scale > 1.35 && n.type==='card');
+    if(!show) continue;
+    const def = TYPE[n.type];
+    const ly = n._sy + Math.max(n._sr,3) + 7;
+    ctx.font = isFocus ? '600 12px -apple-system,"PingFang SC",sans-serif' : '11px -apple-system,"PingFang SC",sans-serif';
+    ctx.globalAlpha = Math.max(0.1, n._a) * n._vis;
+    ctx.fillStyle = isFocus ? '#ffffff' : (n.type==='day' ? 'rgba(190,205,235,.62)' : 'rgba(206,218,245,.72)');
+    ctx.shadowColor = 'rgba(0,0,0,.85)'; ctx.shadowBlur = 6;
+    ctx.fillText(n.label, n._sx, ly);
+    ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+  }
+}
+
+/* ============================================================
+   9. 交互
+   ============================================================ */
+function hitTest(x,y){
+  let best = null, bestD = 1e9;
+  for(let i=0;i<nodes.length;i++){
+    const n = nodes[i];
+    if(hidden[n.type]) continue;
+    if(n._sx===undefined) continue;
+    const d = Math.hypot(x-n._sx, y-n._sy);
+    const lim = Math.max(n._sr*1.9, 11);
+    if(d < lim && d < bestD){ bestD = d; best = n; }
+  }
+  return best;
+}
+
+canvas.addEventListener('mousedown', e=>{
+  const x = e.clientX, y = e.clientY;
+  ANIM.cam = null;
+  const n = hitTest(x,y);
+  mouse.downX = x; mouse.downY = y; mouse.moved = false;
+  if(n){
+    dragNode = n;
+    const [wx,wy] = fromScreen(x,y);
+    dragOffX = n.x - wx; dragOffY = n.y - wy;
+    canvas.classList.add('dragging');
+  } else {
+    panning = true;
+    canvas.classList.add('dragging');
+  }
+});
+window.addEventListener('mousemove', e=>{
+  mouse.x = e.clientX; mouse.y = e.clientY;
+  if(Math.abs(mouse.x-mouse.downX) + Math.abs(mouse.y-mouse.downY) > 3) mouse.moved = true;
+
+  if(dragNode){
+    const [wx,wy] = fromScreen(e.clientX, e.clientY);
+    dragNode.x = wx + dragOffX; dragNode.y = wy + dragOffY;
+    dragNode.ax = dragNode.x; dragNode.ay = dragNode.y;
+    return;
+  }
+  if(panning){
+    view.panX = e.clientX - mouse.downX;
+    view.panY = e.clientY - mouse.downY;
+    return;
+  }
+  const n = hitTest(e.clientX, e.clientY);
+  if(n !== hovered){
+    hovered = n;
+    canvas.classList.toggle('pointer', !!n);
+  }
+});
+window.addEventListener('mouseup', e=>{
+  const clicked = !mouse.moved;
+  const node = dragNode;
+  dragNode = null;
+  panning = false;
+  canvas.classList.remove('dragging');
+  mouse.downX = 0; mouse.downY = 0;
+  if(node && clicked){ openNode(node); }
+  else if(clicked && ANIM.focusMode){ closePanel(); }
+});
+
+canvas.addEventListener('wheel', e=>{
+  e.preventDefault();
+  ANIM.cam = null;
+  const factor = Math.exp(-e.deltaY * 0.0012);
+  const ns = Math.min(3.4, Math.max(0.12, view.scale * factor));
+  const [wx,wy] = fromScreen(e.clientX, e.clientY);
+  view.scale = ns;
+  const p = rotPt(wx,wy);
+  view.panX = e.clientX - cx - p[0]*view.scale;
+  view.panY = e.clientY - cy - p[1]*view.scale;
+}, { passive:false });
+
+canvas.addEventListener('dblclick', e=>{
+  const n = hitTest(e.clientX,e.clientY);
+  if(n) openNode(n, { zoom: 3.2 });
+});
+
+/* ---------- 详情面板 ---------- */
+const panel = document.getElementById('panel');
+
+function openNode(n, opts){
+  opts = opts || {};
+  if(!ANIM.focusMode){
+    ANIM.saved = { scale: view.scale, panX: view.panX, panY: view.panY };
+    ANIM.focusMode = true;
+  }
+  selected = n;
+  ripples.push({ x:n.x, y:n.y, t0: performance.now(), color: TYPE[n.type].color });
+
+  const panelW = 396;
+  const targetCX = Math.max(200, (W - panelW)/2);
+  const targetCY = H/2;
+  const targetScale = clamp(
+    Math.max(view.scale, view.fitScale*2.0, opts.zoom || 0),
+    view.fitScale*1.4, 3.4
+  );
+  const p = rotPt(n.x, n.y);
+  const already = panel.classList.contains('open');
+  if(already) renderPanel(n);
+
+  animateCam({
+    scale: targetScale,
+    panX: targetCX - cx - p[0]*targetScale,
+    panY: targetCY - cy - p[1]*targetScale
+  }, 700, {
+    onDone: function(){
+      if(selected !== n) return;
+      if(!panel.classList.contains('open')){
+        renderPanel(n);
+        panel.classList.add('open');
+      }
+    }
+  });
+}
+
+function closePanel(){
+  panel.classList.remove('open');
+  selected = null;
+  if(ANIM.focusMode){
+    ANIM.focusMode = false;
+    const sv = ANIM.saved;
+    ANIM.saved = null;
+    if(sv) animateCam({ scale:sv.scale, panX:sv.panX, panY:sv.panY }, 640);
+  }
+}
+
+function centerCurrent(){
+  if(!selected) return;
+  const panelW = 396;
+  const targetCX = Math.max(200, (W - panelW)/2);
+  const p = rotPt(selected.x, selected.y);
+  animateCam({
+    scale: view.scale,
+    panX: targetCX - cx - p[0]*view.scale,
+    panY: H/2 - cy - p[1]*view.scale
+  }, 520);
+}
+function renderPanel(n){
+  const def = TYPE[n.type];
+  document.getElementById('pDot').style.color = def.color;
+  document.getElementById('pDot').style.background = def.color;
+  document.getElementById('pType').textContent = def.name;
+  document.getElementById('pTitle').textContent = n.label;
+  document.getElementById('pContent').textContent = n.content || '';
+  const bodyEl = panel.querySelector('.p-body');
+  if(bodyEl){ bodyEl.classList.remove('swap'); void bodyEl.offsetWidth; bodyEl.classList.add('swap'); }
+
+  const meta = document.getElementById('pMeta');
+  meta.innerHTML = '';
+  const rows = Object.assign({}, n.meta || {});
+  if(n.status){
+    const st = n.status==='pending'?'待处理':n.status==='done'?'已完成':'已逾期';
+    const cls = n.status;
+    rows['状态'] = '<span class="chip '+cls+'">'+st+'</span>';
+  }
+  Object.keys(rows).forEach(k=>{
+    const row = document.createElement('div'); row.className='row';
+    row.innerHTML = '<span class="k">'+k+'</span><span class="v">'+rows[k]+'</span>';
+    meta.appendChild(row);
+  });
+
+  const rel = [];
+  links.forEach(l=>{
+    if(l.s===n.id) rel.push({ id:l.t, rel:l.rel });
+    else if(l.t===n.id) rel.push({ id:l.s, rel:l.rel });
+  });
+  document.getElementById('pCount').textContent = rel.length ? '('+rel.length+')' : '(0)';
+  const box = document.getElementById('pLinks');
+  box.innerHTML = '';
+  rel.forEach(r=>{
+    const m = byId[r.id]; if(!m) return;
+    const d = document.createElement('div'); d.className='rel';
+    d.innerHTML = '<span class="dot" style="color:'+TYPE[m.type].color+';background:'+TYPE[m.type].color+'"></span>'+
+      '<span class="lb">'+m.label+'</span><span class="tp">'+TYPE[m.type].name+'</span>';
+    d.addEventListener('click', ()=>{ openNode(m); });
+    box.appendChild(d);
+  });
+
+  const btnDone = document.getElementById('pDone');
+  btnDone.style.display = (n.type==='commitment') ? 'block' : 'none';
+  btnDone.textContent = n.status==='done' ? '已完成' : '标记完成';
+  document.getElementById('pPin').textContent = n.pinned ? '已置顶' : '置顶';
+}
+document.getElementById('pClose').addEventListener('click', ()=>{
+  closePanel();
+});
+document.getElementById('pFocus').addEventListener('click', ()=>{
+  centerCurrent();
+});
+document.getElementById('pPin').addEventListener('click', ()=>{
+  if(!selected) return;
+  selected.pinned = !selected.pinned;
+  renderPanel(selected);
+  toast(selected.pinned ? '已置顶到记忆顶部' : '已取消置顶');
+});
+document.getElementById('pDone').addEventListener('click', ()=>{
+  if(!selected || selected.type!=='commitment') return;
+  selected.status = selected.status==='done' ? 'pending' : 'done';
+  renderPanel(selected);
+  toast(selected.status==='done' ? '已标记完成，状态机已更新' : '已恢复为待处理');
+});
+
+/* ---------- 图例 ---------- */
+const legend = document.getElementById('legend');
+Object.keys(TYPE).forEach(t=>{
+  const cnt = nodes.filter(n=>n.type===t).length;
+  if(!cnt) return;
+  const d = document.createElement('div');
+  d.className = 'lg'; d.dataset.type = t;
+  d.innerHTML = '<span class="dot" style="color:'+TYPE[t].color+';background:'+TYPE[t].color+'"></span>'+
+    '<span>'+TYPE[t].name+'</span><span class="n">'+cnt+'</span>';
+  d.addEventListener('click', ()=>{
+    hidden[t] = !hidden[t];
+    d.classList.toggle('off', !!hidden[t]);
+  });
+  legend.appendChild(d);
+});
+
+/* ---------- 统计 ---------- */
+function refreshStats(){
+  const pending = nodes.filter(n=>n.type==='commitment' && n.status==='pending').length;
+  document.getElementById('stats').innerHTML =
+    '<b>'+nodes.length+'</b> 节点 · <b>'+links.length+'</b> 连接 · <b>'+pending+'</b> 待办';
+}
+refreshStats();
+
+/* ---------- 顶部按钮 ---------- */
+document.getElementById('btnFit').addEventListener('click', ()=>{
+  ANIM.cam = null;
+  if(ANIM.focusMode){
+    ANIM.focusMode = false;
+    ANIM.saved = null;
+    panel.classList.remove('open');
+    selected = null;
+  }
+  view.rot = 0;
+  animateCam({ scale: view.fitScale, panX:0, panY:0 }, 640);
+  toast('视角已重置');
+});
+const btnRot = document.getElementById('btnRotate');
+btnRot.addEventListener('click', ()=>{
+  view.autoRotate = !view.autoRotate;
+  btnRot.classList.toggle('on', view.autoRotate);
+});
+
+/* ---------- 搜索 ---------- */
+const searchInput = document.getElementById('search');
+const searchResults = document.getElementById('searchResults');
+function doSearch(q){
+  q = (q||'').trim().toLowerCase();
+  if(!q){ searchResults.classList.remove('on'); searchResults.innerHTML=''; return; }
+  const hits = nodes.filter(n=> (n.label+' '+(n.content||'')).toLowerCase().includes(q)).slice(0,9);
+  searchResults.innerHTML = '';
+  if(!hits.length){
+    const d = document.createElement('div'); d.className='sr-item';
+    d.innerHTML = '<span style="color:#5f6d8e">没有匹配的记忆</span>';
+    searchResults.appendChild(d);
+  }
+  hits.forEach(n=>{
+    const d = document.createElement('div'); d.className='sr-item';
+    d.innerHTML = '<span class="dot" style="color:'+TYPE[n.type].color+';background:'+TYPE[n.type].color+'"></span>'+
+      '<span>'+n.label+'</span><span class="tp">'+TYPE[n.type].name+'</span>';
+    d.addEventListener('click', ()=>{
+      openNode(n);
+      searchResults.classList.remove('on');
+      searchInput.value = n.label;
+    });
+    searchResults.appendChild(d);
+  });
+  searchResults.classList.add('on');
+}
+searchInput.addEventListener('input', e=>doSearch(e.target.value));
+searchInput.addEventListener('focus', e=>{ if(e.target.value) doSearch(e.target.value); });
+document.addEventListener('click', e=>{
+  if(!e.target.closest('.search-wrap')) searchResults.classList.remove('on');
+});
+document.addEventListener('keydown', e=>{
+  if(e.key === '/' ){ e.preventDefault(); searchInput.focus(); }
+  if(e.key === 'Escape'){
+    closePanel();
+    modal.classList.remove('open');
+    searchResults.classList.remove('on');
+  }
+});
+
+/* ---------- 列表视图 ---------- */
+const modal = document.getElementById('modal');
+const mBody = document.getElementById('mBody');
+let curTab = 'timeline';
+document.getElementById('btnList').addEventListener('click', ()=>{ modal.classList.add('open'); renderList(); });
+document.getElementById('mClose').addEventListener('click', ()=> modal.classList.remove('open'));
+modal.addEventListener('click', e=>{ if(e.target === modal) modal.classList.remove('open'); });
+document.getElementById('tabs').addEventListener('click', e=>{
+  const t = e.target.closest('.tab'); if(!t) return;
+  curTab = t.dataset.tab;
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on', x===t));
+  renderList();
+});
+function renderList(){
+  mBody.innerHTML = '';
+  if(curTab === 'timeline'){
+    DAY_DEFS.slice().reverse().forEach(d=>{
+      const block = document.createElement('div'); block.className='day-block';
+      const h = document.createElement('div'); h.className='day-h';
+      h.innerHTML = '<span class="d">'+d.date+'</span><span class="s">'+d.summary+'</span>';
+      block.appendChild(h);
+      d.cards.forEach((c,ci)=>{
+        const n = byId['c-'+d.date.slice(5)+'-'+ci];
+        const row = document.createElement('div'); row.className='row';
+        row.innerHTML = '<span class="dot" style="color:'+TYPE.card.color+';background:'+TYPE.card.color+'"></span>'+
+          '<span class="tx">'+c.text+'</span>';
+        row.addEventListener('click', ()=>{ modal.classList.remove('open'); select(n); centerOn(n,true); });
+        block.appendChild(row);
+      });
+      mBody.appendChild(block);
+    });
+  } else if(curTab === 'commit'){
+    COMMITMENTS.forEach(c=>{
+      const n = byId['cm:'+c.id];
+      const row = document.createElement('div'); row.className='row';
+      const map = {pending:'待处理',done:'已完成',expired:'已逾期'};
+      row.innerHTML = '<span class="dot" style="color:'+TYPE.commitment.color+';background:'+TYPE.commitment.color+'"></span>'+
+        '<span class="tx">'+c.text+'　<span style="color:#5f6d8e">截止 '+c.due+'</span></span>'+
+        '<span class="st">'+map[c.status]+'</span>';
+      row.addEventListener('click', ()=>{ modal.classList.remove('open'); select(n); centerOn(n,true); });
+      mBody.appendChild(row);
+    });
+  } else {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:9px;padding-top:8px';
+    TOPICS.forEach(t=>{
+      const n = byId['tp:'+t];
+      const cnt = links.filter(l=>l.s===n.id || l.t===n.id).length;
+      const chip = document.createElement('div');
+      chip.className='tab';
+      chip.style.cssText = 'border:1px solid rgba(45,212,191,.22);color:#8fe8dc';
+      chip.textContent = '#'+t+'  '+cnt;
+      chip.addEventListener('click', ()=>{ modal.classList.remove('open'); select(n); centerOn(n,true); });
+      wrap.appendChild(chip);
+    });
+    mBody.appendChild(wrap);
+  }
+}
+
+/* ---------- toast ---------- */
+let toastTimer = null;
+function toast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> el.classList.remove('on'), 1800);
+}
+
+/* ============================================================
+   10. 启动
+   ============================================================ */
+const params = new URLSearchParams(location.search);
+if(params.get('noanim')) document.body.classList.add('noanim');
+resize();
+requestAnimationFrame(frame);
+if(params.get('open')){
+  setTimeout(()=>{ try{ select(byId['day:2026-10-29']); }catch(e){} }, 40);
+}
+if(params.get('list')){
+  setTimeout(()=>{ try{ modal.classList.add('open'); renderList(); }catch(e){} }, 60);
+}
+
+})();
+</script>
+</body>
+</html>

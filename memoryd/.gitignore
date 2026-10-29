@@ -1,0 +1,7 @@
+# memoryd 本地产物：评测/基准报告与日志不入库
+data/
+logs/
+*.log
+node_modules/
+
+*.tgz

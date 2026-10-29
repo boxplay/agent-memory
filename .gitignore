@@ -1,0 +1,41 @@
+# 真实数据与生成物：禁止入库（即使发布到 GitHub）
+memory-ingest/data/
+memory-ingest/memory/bundle.json
+memory-ingest/memory/graph.json
+memory-galaxy/data.js
+memoryd/data/
+*.log
+.env
+.env.*
+
+# 开发交接/验收文档：含本机路径与真实例子，发布前先脱敏再决定是否入库
+HANDOFF-*.md
+research/
+memoryd/REPORT-*.md
+
+# 依赖与打包产物
+node_modules/
+*.tgz
+
+# 同工作区里的其他项目 / 验证产物，不属于 agent-memory
+moss-ui/
+xiaomi-lx06/
+probe/
+_probe/
+archive/
+.npm-cache/
+AI三协议调用方式对照.md
+三协议能力实测报告.md
+云端配置与费用预估.md
+小智类ESP32机器人方案.md
+本机语音模型实测报告.md
+能力闸门修复报告-20261028.md
+
+# 生成/安装产物
+memory-ingest/memory/
+*.plist
+.DS_Store
+
+# 含真实数据/内网信息/本机路径的截图与阶段报告，不入公开仓库
+memory-galaxy/preview-*.png
+memory-ingest/REPORT-*.md

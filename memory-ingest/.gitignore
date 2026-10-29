@@ -1,0 +1,6 @@
+# 原始会话与抽取结果含隐私，默认不进 git
+data/
+memory/bundle.json
+memory/graph.json
+*.log
+.env

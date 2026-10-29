@@ -1,0 +1,21 @@
+{
+  "name": "memoryd",
+  "version": "0.1.0",
+  "private": true,
+  "description": "本地记忆服务：HTTP + MCP（只读检索 / 写回 / 提醒 / 导入导出）",
+  "license": "MIT",
+  "bin": {
+    "memoryd": "bin/memoryd.mjs"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node test/smoke.mjs && node test/eval-recall.mjs && node test/bench.mjs && node test/mcp-smoke.mjs && node test/write-smoke.mjs && node test/ui-check.mjs && node test/ops-smoke.mjs"
+  }
+}
